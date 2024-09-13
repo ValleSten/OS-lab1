@@ -40,6 +40,11 @@ int main(void)
     char *line;
     line = readline("> ");
 
+    if (line == NULL) {
+      printf("CTRL-D was pressed\n");
+      return 0;
+    }
+
     // Remove leading and trailing whitespace from the line
     stripwhite(line);
 
