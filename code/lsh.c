@@ -29,9 +29,14 @@
 
 #include "parse.h"
 
+// Max size of working directory name
+#define cwd_size 256
+
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
+
+static char cwd[cwd_size];
 
 int main(void)
 {
@@ -40,8 +45,9 @@ int main(void)
     char *line;
     line = readline("> ");
 
+    // Handle CTRL-D
+    // The test pass, but I'm not sure if it should handle if the line is not empty when CTRL-D is pressed
     if (line == NULL) {
-      printf("CTRL-D was pressed\n");
       return 0;
     }
 
@@ -58,6 +64,16 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
+        char * pgm = *cmd.pgm->pgmlist;
+        printf("pgm: %s\n", pgm);
+
+        // Gets the current working directory into cwd
+        getcwd(cwd, 256);
+        printf("cwd: %s\n", cwd);
+
+        // Not allowed unfortunately
+        // system(*cmd.pgm->pgmlist);
+        // Look into exec/execve etc
       }
       else
       {
