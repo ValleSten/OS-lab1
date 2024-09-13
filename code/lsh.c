@@ -64,20 +64,18 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
-        char * pgm = *cmd.pgm->pgmlist;
 
         // Gets the current working directory into cwd
-        getcwd(cwd, 256);
-        printf("cwd: %s\n", cwd);
+        getcwd(cwd, cwd_size);
 
         // Create child process to execute system command
         int pid = fork();
-        if  (pid == -1) {
+        if (pid == -1) {
           fprintf(stderr, "fork error \n");
-          // return?
         }
         else if (pid == 0) {
-          execlp(pgm, pgm, (char *) NULL);
+          // Executes system call
+          execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
         }
         else {
           wait(NULL);
