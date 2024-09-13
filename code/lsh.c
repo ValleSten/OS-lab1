@@ -26,7 +26,7 @@
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
-
+#include <sys/wait.h>
 #include "parse.h"
 
 // Max size of working directory name
@@ -65,15 +65,24 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
         char * pgm = *cmd.pgm->pgmlist;
-        printf("pgm: %s\n", pgm);
 
         // Gets the current working directory into cwd
         getcwd(cwd, 256);
         printf("cwd: %s\n", cwd);
 
-        // Not allowed unfortunately
-        // system(*cmd.pgm->pgmlist);
-        // Look into exec/execve etc
+        // Create child process to execute system command
+        int pid = fork();
+        if  (pid == -1) {
+          fprintf(stderr, "fork error \n");
+          // return?
+        }
+        else if (pid == 0) {
+          execlp(pgm, pgm, (char *) NULL);
+        }
+        else {
+          wait(NULL);
+        }
+
       }
       else
       {
