@@ -29,6 +29,10 @@
 #include <sys/wait.h>
 #include "parse.h"
 
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+
 // Max size of working directory name
 #define cwd_size 256
 
@@ -38,8 +42,8 @@ void stripwhite(char *);
 
 static char cwd[cwd_size];
 
-int main(void)
-{
+int main(void) {
+
   for (;;)
   {
     char *line;
@@ -60,8 +64,7 @@ int main(void)
       add_history(line);
 
       Command cmd;
-      if (parse(line, &cmd) == 1)
-      {
+      if (parse(line, &cmd) == 1) {
         // Just prints cmd
         print_cmd(&cmd);
 
@@ -78,12 +81,13 @@ int main(void)
           execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
         }
         else {
-          wait(NULL);
+          // Don't wait if background process.
+          if (!cmd.background) {
+            waitpid(pid, NULL, 0);
+          }
         }
-
       }
-      else
-      {
+      else {
         printf("Parse ERROR\n");
       }
     }
