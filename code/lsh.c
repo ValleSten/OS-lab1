@@ -68,27 +68,41 @@ int main(void) {
         // Just prints cmd
         print_cmd(&cmd);
 
+        char buf;
+        int pipefd[2];
+        if (pipe(pipefd) == -1) {
+          fprintf(stderr, "pipe error \n");
+        }
+
         // Gets the current working directory into cwd
         getcwd(cwd, cwd_size);
 
         // Prevent zombies by removing terminated processes
         signal(SIGCHLD, SIG_IGN);
 
-        // Create child process to execute system command
-        int pid = fork();
-        if (pid == -1) {
-          fprintf(stderr, "fork error \n");
-        }
-        else if (pid == 0) {
-          // Executes system call
-          execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
-        }
-        else {
-          // Don't wait if background process.
-          if (!cmd.background) {
-            waitpid(pid, NULL, 0);
+        Pgm *p = cmd.pgm;
+
+        // Piping commands, should probably be separate method and execute resursively as pgmlist is backwards
+        while (p) {
+          printf("Command: %s\n", *p->pgmlist);
+          // Create child process to execute system command
+          int pid = fork();
+          if (pid == -1) {
+            fprintf(stderr, "fork error \n");
           }
+          else if (pid == 0) {
+            execvp(p->pgmlist[0], p->pgmlist);
+          }
+          else {
+            // Don't wait if background process.
+            if (!cmd.background) {
+              waitpid(pid, NULL, 0);
+            }
+          }
+
+          p = p->next;
         }
+
       }
       else {
         printf("Parse ERROR\n");
