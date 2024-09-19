@@ -71,6 +71,9 @@ int main(void) {
         // Gets the current working directory into cwd
         getcwd(cwd, cwd_size);
 
+        // Prevent zombies by removing terminated processes
+        signal(SIGCHLD, SIG_IGN);
+
         // Create child process to execute system command
         int pid = fork();
         if (pid == -1) {
@@ -79,6 +82,7 @@ int main(void) {
         else if (pid == 0) {
           // Executes system call
           execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
+          exit(0);
         }
         else {
           // Don't wait if background process.
