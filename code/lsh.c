@@ -82,7 +82,6 @@ int main(void) {
         else if (pid == 0) {
           // Executes system call
           execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
-          exit(0);
         }
         else {
           // Don't wait if background process.
