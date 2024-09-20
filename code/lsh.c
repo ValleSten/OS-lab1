@@ -39,6 +39,7 @@
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 static int handle_builtin(Pgm *p);
+static void handle_pipe(Command *cmd);
 void stripwhite(char *);
 
 static char cwd[cwd_size];
@@ -116,6 +117,36 @@ int main(void)
   }
 
   return 0;
+}
+
+static void handle_pipe(Command *cmd)
+{
+  int pipefd[2];
+  char *buf;
+
+  Pgm *p = cmd->pgm;
+
+  if (p == NULL)
+  {
+    return;
+  }
+
+  // Recursively reach first progam
+  handle_pipe(p->next);
+  int pid = fork();
+  if (pid == -1)
+  {
+    fprintf(stderr, "fork error \n");
+  }
+  else if (pid == 0)
+  {
+    
+  }
+  else
+  {
+
+  }
+
 }
 
 /*
