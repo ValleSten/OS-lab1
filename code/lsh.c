@@ -39,7 +39,8 @@
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 static int handle_builtin(Pgm *p);
-static void handle_pipe(Command *cmd);
+static void handle_pipe(Pgm *p);
+static void execute_command(Command cmd);
 void stripwhite(char *);
 
 static char cwd[cwd_size];
@@ -95,7 +96,7 @@ int main(void)
         }
         else if (pid == 0)
         {
-          execvp(p->pgmlist[0], p->pgmlist);
+          execute_command(cmd);
         }
         else
         {
@@ -119,41 +120,70 @@ int main(void)
   return 0;
 }
 
-static void handle_pipe(Command *cmd)
+/*
+ * Executes any command.
+ */
+static void execute_command(Command cmd)
 {
-  int pipefd[2];
-  char *buf;
-
-  Pgm *p = cmd->pgm;
-
-  if (p == NULL)
+  Pgm *p = cmd.pgm;
+  if (p->next != NULL)
   {
-    return;
+    handle_pipe(cmd.pgm);
   }
-
-  // Recursively reach first progam
-  handle_pipe(p->next);
-  int pid = fork();
-  if (pid == -1)
-  {
-    fprintf(stderr, "fork error \n");
-  }
-  else if (pid == 0)
-  {
-    
-  }
-  else
-  {
-
-  }
-
+  execvp(p->pgmlist[0], p->pgmlist);
 }
 
 /*
-* Handles the built-in functions "cd" and "exit".
-*
-* Returns 1 if the program was a built-in function, otherwise 0.
-*/
+ * Executes piped commands.
+ */
+static void handle_pipe(Pgm *p)
+{
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        fprintf(stderr, "pipe error\n");
+        return;
+    }
+
+    int pid = fork();
+    if (pid == -1) {
+        fprintf(stderr, "fork error\n");
+        return;
+    }
+
+    if (pid == 0)
+    {
+      // Move to next program since parent will execute this program
+      Pgm pgm = *p->next;
+      if (p->next != NULL)
+      {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO); // Redirect stdout to pipe write end
+        close(pipefd[1]);
+
+        handle_pipe(&pgm); // Recursive call for the next command
+      }
+
+      // Execute the current command
+      execvp(pgm.pgmlist[0], pgm.pgmlist);
+    }
+    else
+    {
+      close(pipefd[1]);
+      dup2(pipefd[0], STDIN_FILENO); // Redirect stdin to pipe read end
+      close(pipefd[0]);
+
+      waitpid(pid, NULL, 0); // Wait for the child process to finish
+
+      // Execute the current command in the parent process
+      execvp(p->pgmlist[0], p->pgmlist);
+    }
+}
+
+/*
+ * Handles the built-in functions "cd" and "exit".
+ *
+ * Returns 1 if the program was a built-in function, otherwise 0.
+ */
 static int handle_builtin(Pgm *p)
 {
   if (strcmp(p->pgmlist[0], "cd") == 0)
@@ -166,13 +196,12 @@ static int handle_builtin(Pgm *p)
       {
         perror("Failed to change directory to specified path");
       }
-      return 1;
     }
     else // if no path is provided, return to "HOME"
     {
       chdir(getenv("HOME"));
-      return 1;
     }
+    return 1;
   }
   else if (strcmp(p->pgmlist[0], "exit") == 0)
   {
