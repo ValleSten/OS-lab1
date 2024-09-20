@@ -42,7 +42,8 @@ void stripwhite(char *);
 
 static char cwd[cwd_size];
 
-int main(void) {
+int main(void)
+{
 
   for (;;)
   {
@@ -51,7 +52,8 @@ int main(void) {
 
     // Handle CTRL-D
     // The test pass, but I'm not sure if it should handle if the line is not empty when CTRL-D is pressed
-    if (line == NULL) {
+    if (line == NULL)
+    {
       return 0;
     }
 
@@ -64,13 +66,15 @@ int main(void) {
       add_history(line);
 
       Command cmd;
-      if (parse(line, &cmd) == 1) {
+      if (parse(line, &cmd) == 1)
+      {
         // Just prints cmd
         print_cmd(&cmd);
 
         char buf;
         int pipefd[2];
-        if (pipe(pipefd) == -1) {
+        if (pipe(pipefd) == -1)
+        {
           fprintf(stderr, "pipe error \n");
         }
 
@@ -82,29 +86,51 @@ int main(void) {
 
         Pgm *p = cmd.pgm;
 
-        // Piping commands, should probably be separate method and execute resursively as pgmlist is backwards
-        while (p) {
-          printf("Command: %s\n", *p->pgmlist);
-          // Create child process to execute system command
-          int pid = fork();
-          if (pid == -1) {
-            fprintf(stderr, "fork error \n");
-          }
-          else if (pid == 0) {
-            execvp(p->pgmlist[0], p->pgmlist);
-          }
-          else {
-            // Don't wait if background process.
-            if (!cmd.background) {
-              waitpid(pid, NULL, 0);
-            }
-          }
-
-          p = p->next;
+        // Handle exit before fork
+        if (strcmp(cmd.pgm->pgmlist[0], "exit") == 0)
+        {
+          exit(0);
         }
 
+        // Create child process to execute system command
+        int pid = fork();
+        if (pid == -1)
+        {
+          fprintf(stderr, "fork error \n");
+        }
+        else if (pid == 0)
+        {
+          // Handle built in functions
+          if (strcmp(cmd.pgm->pgmlist[0], "cd") == 0)
+          {
+            if (cmd.pgm->pgmlist[1] != NULL)
+            {
+              int ret;
+              ret = chdir(cmd.pgm->pgmlist[1]); // change the directory to the provided one
+              if (ret != 0)                     // if CHDIR fails print error
+              {
+                perror("Failed to change directory to specified path");
+              }
+            }
+            else // if no path is provided, return to "HOME"
+            {
+              chdir(getenv("HOME"));
+            }
+          }
+          execvp(p->pgmlist[0], p->pgmlist);
+        }
+        else
+        {
+          // Don't wait if background process.
+          if (!cmd.background)
+          {
+            waitpid(pid, NULL, 0);
+          }
+        }
       }
-      else {
+
+      else
+      {
         printf("Parse ERROR\n");
       }
     }
@@ -159,7 +185,6 @@ static void print_pgm(Pgm *p)
     printf("]\n");
   }
 }
-
 
 /* Strip whitespace from the start and end of a string.
  *
