@@ -38,6 +38,7 @@
 
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
+static int handle_builtin(Pgm *p);
 void stripwhite(char *);
 
 static char cwd[cwd_size];
@@ -71,13 +72,6 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
 
-        char buf;
-        int pipefd[2];
-        if (pipe(pipefd) == -1)
-        {
-          fprintf(stderr, "pipe error \n");
-        }
-
         // Gets the current working directory into cwd
         getcwd(cwd, cwd_size);
 
@@ -86,10 +80,10 @@ int main(void)
 
         Pgm *p = cmd.pgm;
 
-        // Handle exit before fork
-        if (strcmp(cmd.pgm->pgmlist[0], "exit") == 0)
+        // Handle built-in function calls
+        if (1 == handle_builtin(p))
         {
-          exit(0);
+          continue;
         }
 
         // Create child process to execute system command
@@ -100,23 +94,6 @@ int main(void)
         }
         else if (pid == 0)
         {
-          // Handle built in functions
-          if (strcmp(cmd.pgm->pgmlist[0], "cd") == 0)
-          {
-            if (cmd.pgm->pgmlist[1] != NULL)
-            {
-              int ret;
-              ret = chdir(cmd.pgm->pgmlist[1]); // change the directory to the provided one
-              if (ret != 0)                     // if CHDIR fails print error
-              {
-                perror("Failed to change directory to specified path");
-              }
-            }
-            else // if no path is provided, return to "HOME"
-            {
-              chdir(getenv("HOME"));
-            }
-          }
           execvp(p->pgmlist[0], p->pgmlist);
         }
         else
@@ -128,7 +105,6 @@ int main(void)
           }
         }
       }
-
       else
       {
         printf("Parse ERROR\n");
@@ -139,6 +115,38 @@ int main(void)
     free(line);
   }
 
+  return 0;
+}
+
+/*
+* Handles the built-in functions "cd" and "exit".
+*
+* Returns 1 if the program was a built-in function, otherwise 0.
+*/
+static int handle_builtin(Pgm *p)
+{
+  if (strcmp(p->pgmlist[0], "cd") == 0)
+  {
+    if (p->pgmlist[1] != NULL)
+    {
+      int ret;
+      ret = chdir(p->pgmlist[1]); // change the directory to the provided one
+      if (ret != 0)               // if CHDIR fails print error
+      {
+        perror("Failed to change directory to specified path");
+      }
+      return 1;
+    }
+    else // if no path is provided, return to "HOME"
+    {
+      chdir(getenv("HOME"));
+      return 1;
+    }
+  }
+  else if (strcmp(p->pgmlist[0], "exit") == 0)
+  {
+    exit(0);
+  }
   return 0;
 }
 
