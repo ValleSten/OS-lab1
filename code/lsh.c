@@ -39,7 +39,7 @@
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 static int handle_builtin(Pgm *p);
-static void handle_pipe(Pgm *p);
+static void handle_pipe(Command cmd);
 static void execute_command(Command cmd);
 void stripwhite(char *);
 
@@ -128,7 +128,7 @@ static void execute_command(Command cmd)
   Pgm *p = cmd.pgm;
   if (p->next != NULL)
   {
-    handle_pipe(cmd.pgm);
+    handle_pipe(cmd);
   }
   execvp(p->pgmlist[0], p->pgmlist);
 }
@@ -136,8 +136,9 @@ static void execute_command(Command cmd)
 /*
  * Executes piped commands.
  */
-static void handle_pipe(Pgm *p)
+static void handle_pipe(Command cmd)
 {
+    Pgm *p = cmd.pgm;
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         fprintf(stderr, "pipe error\n");
@@ -154,13 +155,14 @@ static void handle_pipe(Pgm *p)
     {
       // Move to next program since parent will execute this program
       Pgm pgm = *p->next;
+      cmd.pgm = p->next;
       if (p->next != NULL)
       {
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO); // Redirect stdout to pipe write end
         close(pipefd[1]);
 
-        handle_pipe(&pgm); // Recursive call for the next command
+        handle_pipe(cmd); // Recursive call for the next command
       }
 
       // Execute the current command
