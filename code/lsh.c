@@ -31,7 +31,9 @@
 
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <signal.h>
+#include <fcntl.h>
 
 // Max size of working directory name
 #define cwd_size 256
@@ -42,15 +44,31 @@ static int handle_builtin(Pgm *p);
 static void handle_pipe(Command cmd);
 static void execute_command(Command cmd);
 void stripwhite(char *);
+static void int_handler(int sig);
+
+//Global int to store the PID of the foreground process
+int fg_pid = -1;
 
 static char cwd[cwd_size];
+static char *login;
 
 int main(void)
 {
+  // Prevent zombies by removing terminated processes
+  signal(SIGCHLD, SIG_IGN);
 
   for (;;)
   {
+
+    // Gets the current working directory into cwd
+    getcwd(cwd, cwd_size);
+    login = getlogin();
+
+    // Handle CTRL-C
+    signal(SIGINT, int_handler);
+
     char *line;
+    printf("%s:%s", login, cwd);
     line = readline("> ");
 
     // Handle CTRL-D
@@ -74,12 +92,6 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
 
-        // Gets the current working directory into cwd
-        getcwd(cwd, cwd_size);
-
-        // Prevent zombies by removing terminated processes
-        signal(SIGCHLD, SIG_IGN);
-
         Pgm *p = cmd.pgm;
 
         // Handle built-in function calls
@@ -89,13 +101,19 @@ int main(void)
         }
 
         // Create child process to execute system command
-        int pid = fork();
-        if (pid == -1)
+        fg_pid = fork();
+        if (fg_pid == -1)
         {
           fprintf(stderr, "fork error \n");
         }
-        else if (pid == 0)
+        else if (fg_pid == 0)
         {
+          // Making sure that if this is a background process to not ignore ctrl c interupt
+          if (cmd.background)
+          {
+            signal(SIGINT, SIG_IGN);
+          }
+
           execute_command(cmd);
         }
         else
@@ -103,7 +121,7 @@ int main(void)
           // Don't wait if background process.
           if (!cmd.background)
           {
-            waitpid(pid, NULL, 0);
+            waitpid(fg_pid, NULL, 0);
           }
         }
       }
@@ -121,11 +139,51 @@ int main(void)
 }
 
 /*
+* Handles io redirection, dupes inputfile/outfile to
+*
+* standard input/output
+*/
+static void io_redirection(Command *cmd)
+{
+  if (cmd->rstdout)
+  {
+    int mode =  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;    //permission bits should be specified if using open to create file
+    int flags = O_WRONLY| O_CREAT | O_TRUNC;  //flags used open-writeonly create if no file exists
+    int fd_out = open(cmd->rstdout, flags,  mode); // or truncate outputfile if it is not empty
+    if (fd_out == -1)                 //ret  value for failure
+    {
+      fprintf(stderr,"couldnt open output file");
+      exit(1);
+    }
+    else
+    {
+      dup2(fd_out, STDOUT_FILENO);  //redirect stdout to given file for outpu
+      close(fd_out);                
+    }
+  }
+  if (cmd->rstdin)                  //check for input redirection
+  {
+    int fd_in = open(cmd->rstdin, O_RDONLY);   //open inputfile in readonly
+    if (fd_in == -1)                  //return value of failure of open is -1
+    {
+      fprintf(stderr,"couldnt open input file");
+      exit(1);                      //exit failure
+    }
+    else
+    {
+      dup2(fd_in, STDIN_FILENO);       //redirect stdin to inputfile
+      close(fd_in);
+    }
+  }
+}
+
+/*
  * Executes any command.
  */
 static void execute_command(Command cmd)
 {
   Pgm *p = cmd.pgm;
+  io_redirection(&cmd);
   if (p->next != NULL)
   {
     handle_pipe(cmd);
@@ -210,6 +268,19 @@ static int handle_builtin(Pgm *p)
     exit(0);
   }
   return 0;
+}
+
+/*
+ * Handler for CTRL + C
+ */
+static void int_handler(int sig)
+{
+  (void) sig; //ignore sig because it is not used
+  if(fg_pid > 0) // fg_pid is going to have the pid of the foreground process
+  {
+    kill(fg_pid, SIGINT); // Terminate that process.
+  }
+  printf("\n%s:%s> ", login, cwd);
 }
 
 /*
