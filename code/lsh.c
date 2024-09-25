@@ -56,13 +56,12 @@ int main(void)
   // Prevent zombies by removing terminated processes
   signal(SIGCHLD, SIG_IGN);
 
-
   for (;;)
   {
 
     // Handle CTRL-C
     signal(SIGINT, int_handler);
-    
+
     char *line;
     line = readline("> ");
 
@@ -138,7 +137,7 @@ int main(void)
 }
 
 /*
-* handles io redirection, dupes inputfile/outfile to
+* Handles io redirection, dupes inputfile/outfile to
 *
 * standard input/output
 */
