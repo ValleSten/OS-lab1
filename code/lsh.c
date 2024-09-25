@@ -50,6 +50,7 @@ static void int_handler(int sig);
 int fg_pid = -1;
 
 static char cwd[cwd_size];
+static char *login;
 
 int main(void)
 {
@@ -59,10 +60,15 @@ int main(void)
   for (;;)
   {
 
+    // Gets the current working directory into cwd
+    getcwd(cwd, cwd_size);
+    login = getlogin();
+
     // Handle CTRL-C
     signal(SIGINT, int_handler);
 
     char *line;
+    printf("%s:%s", login, cwd);
     line = readline("> ");
 
     // Handle CTRL-D
@@ -85,10 +91,6 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
-
-        // Gets the current working directory into cwd
-        getcwd(cwd, cwd_size);
-
 
         Pgm *p = cmd.pgm;
 
@@ -278,7 +280,7 @@ static void int_handler(int sig)
   {
     kill(fg_pid, SIGINT); // Terminate that process.
   }
-  printf("\n> ");
+  printf("\n%s:%s> ", login, cwd);
 }
 
 /*
