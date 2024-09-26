@@ -36,7 +36,7 @@
 #include <fcntl.h>
 
 // Max size of working directory name
-#define cwd_size 256
+#define cwd_size 512
 
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
@@ -44,10 +44,7 @@ static int handle_builtin(Pgm *p);
 static void handle_pipe(Command cmd);
 static void execute_command(Command cmd);
 void stripwhite(char *);
-static void int_handler(int sig);
-
-//Global int to store the PID of the foreground process
-int fg_pid = -1;
+static void int_handler();
 
 static char cwd[cwd_size];
 static char *login;
@@ -101,12 +98,12 @@ int main(void)
         }
 
         // Create child process to execute system command
-        fg_pid = fork();
-        if (fg_pid == -1)
+        int pid = fork();
+        if (pid == -1)
         {
           fprintf(stderr, "fork error \n");
         }
-        else if (fg_pid == 0)
+        else if (pid == 0)
         {
           // Making sure that if this is a background process to not ignore ctrl c interupt
           if (cmd.background)
@@ -121,7 +118,7 @@ int main(void)
           // Don't wait if background process.
           if (!cmd.background)
           {
-            waitpid(fg_pid, NULL, 0);
+            waitpid(pid, NULL, 0);
           }
         }
       }
@@ -273,13 +270,8 @@ static int handle_builtin(Pgm *p)
 /*
  * Handler for CTRL + C
  */
-static void int_handler(int sig)
+static void int_handler()
 {
-  (void) sig; //ignore sig because it is not used
-  if(fg_pid > 0) // fg_pid is going to have the pid of the foreground process
-  {
-    kill(fg_pid, SIGINT); // Terminate that process.
-  }
   printf("\n%s:%s> ", login, cwd);
 }
 
